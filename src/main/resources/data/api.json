@@ -1,0 +1,65 @@
+{
+  "name": "电商订单API",
+  "version": "v1.2",
+  "basePath": "/api/v1",
+  "endpoints": [
+    {
+      "path": "/orders",
+      "method": "POST",
+      "description": "创建新订单",
+      "parameters": [
+        {"name": "customerId", "type": "string", "required": true, "minLength": 1},
+        {"name": "items", "type": "array", "required": true, "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": {"type": "string", "required": true},
+              "quantity": {"type": "integer", "required": true, "minimum": 1, "maximum": 100},
+              "price": {"type": "number", "required": true, "minimum": 0}
+            }
+          }},
+        {"name": "shippingAddress", "type": "object", "required": true,
+          "properties": {
+            "street": {"type": "string", "required": true},
+            "city": {"type": "string", "required": true},
+            "zipCode": {"type": "string", "required": true, "pattern": "^\\\\d{5}(-\\\\d{4})?$"}
+          }},
+        {"name": "paymentMethod", "type": "string", "required": true, "enum": ["CREDIT_CARD", "PAYPAL", "BANK_TRANSFER"]}
+      ],
+      "responses": {
+        "201": {
+          "description": "订单创建成功",
+          "schema": {
+            "orderId": "string",
+            "totalAmount": "number",
+            "estimatedDelivery": "string"
+          }
+        },
+        "400": {"description": "请求参数无效"},
+        "401": {"description": "未授权访问"},
+        "429": {"description": "请求频率过高"},
+        "500": {"description": "服务器内部错误"}
+      }
+    },
+    {
+      "path": "/orders/{orderId}",
+      "method": "GET",
+      "description": "获取订单详情",
+      "parameters": [
+        {"name": "orderId", "type": "string", "required": true, "in": "path"}
+      ],
+      "responses": {
+        "200": {
+          "description": "订单详情",
+          "schema": {
+            "orderId": "string",
+            "status": "string",
+            "items": "array",
+            "totalAmount": "number"
+          }
+        },
+        "404": {"description": "订单不存在"}
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "setup_auth": {
+    "status": "passed",
+    "response": {
+      "status": 200,
+      "body": {
+        "token": {
+          "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+          "expiresIn": 3600
+        }
+      }
+    },
+    "executionTime": 45
+  }
+}
