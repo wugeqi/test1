@@ -1,5 +1,6 @@
 package org.autotestdemo.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.autotestdemo.llm.LLMService;
 import org.autotestdemo.service.SuggestionService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,7 +91,7 @@ public class SuggestionImpl implements SuggestionService {
         return escaped;
     }
     @Override
-    public String getSuggestion(String api, String environment, String dependency, String test, String testResult) {
+    public String getSuggestion(String api, String environment, String dependency, String test, String testResult) throws JsonProcessingException {
 
         String response = llmService.getMessage(buildStandardPrompt(api,environment,dependency,test,testResult));
         return response;

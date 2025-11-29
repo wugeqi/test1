@@ -1,5 +1,8 @@
 package org.autotestdemo.llm.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import org.autotestdemo.dto.MessageDTO;
+import org.autotestdemo.dto.RequestBodyDTO;
 import org.autotestdemo.llm.LLMService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,8 +10,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
@@ -32,31 +37,58 @@ public class SiliconFlowLLMService implements LLMService {
     public SiliconFlowLLMService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
-
+    private static int MAX_CONTENT_LENGTH=4000;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Override
-    public String getMessage(String query) {
+    public String getMessage(String query) throws JsonProcessingException {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("Authorization", "Bearer " + apiToken);
+        String processedQuery = processQuery(query);
 
-        // 直接构建 JSON 字符串
-        String requestBody = String.format(
-                "{\"model\": \"%s\", \"messages\": [{\"role\": \"user\", \"content\": \"%s\"}], " +
-                        "\"max_tokens\": 512, \"temperature\": 0.7}",
-                model,
-                query.replace("\"", "\\\"")  // 转义双引号
+        // 3. 构建请求体 Map（结构化，避免拼接错误）
+        RequestBodyDTO requestBodyDTO = new RequestBodyDTO();
+        requestBodyDTO.setModel(model.trim()); // 去除首尾空格
+        requestBodyDTO.setMax_tokens(512);
+        requestBodyDTO.setTemperature(0.7);
+        requestBodyDTO.setStream(false);
+        MessageDTO messageDTO = new MessageDTO();
+        messageDTO.setRole("user"); // 固定为 user，不能修改
+        messageDTO.setContent(processedQuery);
+        requestBodyDTO.setMessages(new MessageDTO[]{messageDTO});
+
+        // 4. 序列化（Jackson 自动处理所有转义，避免手动拼接错误）
+        String requestJson = OBJECT_MAPPER.writeValueAsString(requestBodyDTO);
+        logger.info("SiliconFlow 请求体：{}", requestJson);
+        HttpEntity<String> requestEntity = new HttpEntity<>(requestJson, headers);
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                apiUrl,        // 接口地址
+                requestEntity, // 请求头+请求体
+                String.class   // 响应体类型
         );
+        return  extractTextFromJsonResponse(response.getBody());
 
-        HttpEntity<String> requestEntity = new HttpEntity<>(requestBody, headers);
 
-        logger.debug("发送请求到 SiliconFlow API: {}", requestBody);
+    }
 
-        String jsonResponse = restTemplate.postForObject(apiUrl, requestEntity, String.class);
-        logger.debug("收到 API 响应");
+    /**
+     *
+     * @param query
+     * @return
+     */
+    private static String processQuery(String query) {
+        // 截断过长的 query（避免请求体超限）
+        String truncatedQuery = query.length() > MAX_CONTENT_LENGTH ?
+                query.substring(0, MAX_CONTENT_LENGTH) + "...[内容截断]" : query;
 
-        return extractTextFromJsonResponse(jsonResponse);
-
+        // 转义所有特殊字符（Jackson 会自动转义，但提前处理更保险）
+        return truncatedQuery
+                .replace("\\", "\\\\")   // 转义反斜杠
+                .replace("\"", "\\\"")  // 转义双引号
+                .replace("\n", "\\n")    // 转义换行符
+                .replace("\r", "\\r")    // 转义回车符
+                .replace("\t", "\\t");   // 转义制表符
     }
     /**
      * 从 JSON 响应中提取文字内容（使用 Spring 的 JsonParser）

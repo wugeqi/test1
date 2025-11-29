@@ -24,6 +24,7 @@
         <version>2.7.15</version>
         <relativePath/>
     </parent>
+    <!-- Jackson 核心依赖（处理 JSON 序列化/反序列化） -->
 
     <dependencies>
         <!-- Spring Boot Web Starter (包含 RestTemplate) -->
@@ -51,6 +52,7 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
+
 
         <!-- 日志 -->
         <dependency>
