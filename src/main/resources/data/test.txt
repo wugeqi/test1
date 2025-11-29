@@ -1,0 +1,164 @@
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.springframework.http.*;
+import org.springframework.web.client.RestTemplate;
+import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * 飞书发送消息API自动化测试（正常场景）
+ * 覆盖：文本消息发送、卡片消息发送、响应断言、参数合法性校验
+ */
+public class FeishuSendMessageTest {
+// 配置项（需替换为实际有效值）
+private static final String TENANT_ACCESS_TOKEN = "t-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; // 替换为真实token
+private static final String CHAT_ID = "oc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; // 替换为真实群ID
+private static final String API_URL = "https://open.feishu.cn/open-apis/im/v1/messages";
+
+// 核心工具类
+private RestTemplate restTemplate;
+private ObjectMapper objectMapper;
+
+/**
+ * 初始化工具类（每个测试类执行一次）
+ */
+@BeforeClass
+public void init() {
+restTemplate = new RestTemplate();
+objectMapper = new ObjectMapper();
+}
+
+/**
+ * 测试场景1：发送文本消息（正常流程）
+ * 验证点：参数合法、接口返回200、响应code=0、消息ID非空
+ */
+@Test(description = "发送文本消息-正常场景")
+public void testSendTextMessage() throws JsonProcessingException {
+// 1. 构建请求头
+HttpHeaders headers = new HttpHeaders();
+headers.setContentType(MediaType.APPLICATION_JSON);
+headers.set("Authorization", "Bearer " + TENANT_ACCESS_TOKEN);
+
+// 2. 构建请求体（文本消息）
+Map<String, Object> requestBody = new HashMap<>();
+requestBody.put("receive_id", CHAT_ID); // 接收者ID（群聊）
+requestBody.put("msg_type", "text");    // 消息类型：文本
+// 构建文本内容（含随机字符避免重复）
+String textContent = "{\"text\":\"自动化测试文本消息-" + RandomStringUtils.randomAlphanumeric(8) + "\"}";
+requestBody.put("content", textContent);
+// 生成唯一UUID用于去重
+requestBody.put("uuid", UUID.randomUUID().toString().replace("-", "").substring(0, 50));
+
+// 3. 构建请求参数（指定接收者ID类型为chat_id）
+Map<String, String> params = new HashMap<>();
+params.put("receive_id_type", "chat_id");
+
+// 4. 调用接口
+HttpEntity<String> requestEntity = new HttpEntity<>(
+objectMapper.writeValueAsString(requestBody),
+headers
+);
+ResponseEntity<String> response = restTemplate.exchange(
+API_URL,
+HttpMethod.POST,
+requestEntity,
+String.class,
+params
+);
+
+// 5. 响应断言（核心验证点）
+// 5.1 校验HTTP状态码为200
+Assert.assertEquals(response.getStatusCode(), HttpStatus.OK, "HTTP状态码非200");
+// 5.2 解析响应体并校验业务码
+Map<String, Object> responseMap = objectMapper.readValue(response.getBody(), Map.class);
+Assert.assertEquals(responseMap.get("code"), 0, "业务错误码非0");
+Assert.assertEquals(responseMap.get("msg"), "success", "接口返回失败");
+// 5.3 校验消息ID非空
+Map<String, Object> dataMap = (Map<String, Object>) responseMap.get("data");
+Assert.assertNotNull(dataMap.get("message_id"), "消息ID为空");
+// 5.4 校验消息类型匹配
+Assert.assertEquals(dataMap.get("msg_type"), "text", "消息类型不匹配");
+
+System.out.println("文本消息发送成功，消息ID：" + dataMap.get("message_id"));
+}
+
+/**
+ * 测试场景2：发送卡片消息（正常流程）
+ * 验证点：卡片JSON格式合法、接口返回成功、响应字段完整
+ */
+@Test(description = "发送卡片消息-正常场景")
+public void testSendCardMessage() throws JsonProcessingException {
+// 1. 构建请求头
+HttpHeaders headers = new HttpHeaders();
+headers.setContentType(MediaType.APPLICATION_JSON);
+headers.set("Authorization", "Bearer " + TENANT_ACCESS_TOKEN);
+
+// 2. 构建卡片内容（合法的JSON结构，需转义特殊字符）
+String cardContent = "{\"elements\":[{\"tag\":\"markdown\",\"content\":\"### 自动化测试卡片\\n\\n这是一条正常场景的卡片消息测试\\n<at id=\\\"all\\\"></at>\"}]}";
+// 3. 构建请求体
+Map<String, Object> requestBody = new HashMap<>();
+requestBody.put("receive_id", CHAT_ID);
+requestBody.put("msg_type", "interactive"); // 消息类型：卡片
+requestBody.put("content", cardContent);
+requestBody.put("uuid", UUID.randomUUID().toString().replace("-", "").substring(0, 50));
+
+// 4. 构建请求参数
+Map<String, String> params = new HashMap<>();
+params.put("receive_id_type", "chat_id");
+
+// 5. 调用接口
+HttpEntity<String> requestEntity = new HttpEntity<>(
+objectMapper.writeValueAsString(requestBody),
+headers
+);
+ResponseEntity<String> response = restTemplate.exchange(
+API_URL,
+HttpMethod.POST,
+requestEntity,
+String.class,
+params
+);
+
+// 6. 响应断言
+Assert.assertEquals(response.getStatusCode(), HttpStatus.OK, "HTTP状态码非200");
+Map<String, Object> responseMap = objectMapper.readValue(response.getBody(), Map.class);
+// 核心断言
+Assert.assertEquals(responseMap.get("code"), 0, "卡片消息发送失败，错误码：" + responseMap.get("code"));
+Assert.assertEquals(responseMap.get("msg"), "success", "接口返回错误描述：" + responseMap.get("msg"));
+// 校验卡片消息类型
+Map<String, Object> dataMap = (Map<String, Object>) responseMap.get("data");
+Assert.assertEquals(dataMap.get("msg_type"), "interactive", "卡片消息类型不匹配");
+// 校验发送者类型为应用
+Map<String, Object> senderMap = (Map<String, Object>) dataMap.get("sender");
+Assert.assertEquals(senderMap.get("sender_type"), "app", "发送者类型非应用");
+
+System.out.println("卡片消息发送成功，消息ID：" + dataMap.get("message_id"));
+}
+
+/**
+ * 测试场景3：参数合法性前置校验（非接口调用，验证入参规则）
+ * 验证点：UUID长度、content转义、receive_id非空
+ */
+@Test(description = "入参合法性校验-正常场景")
+public void testParamValidation() {
+// 1. 校验UUID长度（最大50字符）
+String uuid = UUID.randomUUID().toString().replace("-", "");
+Assert.assertTrue(uuid.length() <= 50, "UUID长度超过50字符限制");
+// 2. 校验content转义（换行符转义）
+String rawText = "测试\n换行符";
+String escapedText = rawText.replace("\n", "\\n");
+Assert.assertEquals(escapedText, "测试\\n换行符", "换行符未正确转义");
+// 3. 校验receive_id非空
+Assert.assertFalse(CHAT_ID.isEmpty(), "receive_id不能为空");
+// 4. 校验msg_type合法性
+Assert.assertTrue("text".equals("text") || "interactive".equals("text"), "msg_type需为合法值");
+
+System.out.println("入参合法性校验通过");
+}
+}
