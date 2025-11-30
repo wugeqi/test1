@@ -33,12 +33,16 @@ public class application {
     public CommandLineRunner run(SuggestionService suggestionService) {
         return args -> {
             // 从 resources 目录读取 JSON 文件
-            String apiDoc = readJsonFile("data/apidoc.txt");
-            String environment = readJsonFile("data/environment.txt");
-            String dependency = readJsonFile("data/dependency.json");
-            String testScript = readJsonFile("data/test.txt");       // 注意：您提供的文件是test.json，而不是test-script.json
-            String testResult = readJsonFile("data/testresult.json"); // 注意：您提供的文件是testresult.json，而不是test-result.json
-
+//            String apiDoc = readJsonFile("data/api.json");
+//            String environment = readJsonFile("data/environment.json");
+//            String dependency = readJsonFile("data/dependency.json");
+//            String testScript = readJsonFile("data/test.json");       // 注意：您提供的文件是test.json，而不是test-script.json
+//            String testResult = readJsonFile("data/testresult.json"); // 注意：您提供的文件是testresult.json，而不是test-result.json
+            String apiDoc="";
+            String environment="";
+            String dependency="";
+            String testScript="";
+            String testResult="";
             String response = suggestionService.getSuggestion(apiDoc, environment, dependency, testScript, testResult);
             System.out.println("=== 测试建议分析结果 ===");
             System.out.println(response);
